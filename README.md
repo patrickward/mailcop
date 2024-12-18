@@ -4,6 +4,8 @@ A Go package for validating email addresses according to RFC 5322 and additional
 It uses the Go standard library for syntax validation and provides options for checking DNS records,
 disposable email domains, free email providers, and reserved domains.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/patrickward/mailcop.svg)](https://pkg.go.dev/github.com/patrickward/mailcop)
+
 ## Features
 
 - RFC 5322 email syntax validation using the Go standard library
