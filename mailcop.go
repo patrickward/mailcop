@@ -23,6 +23,7 @@ type Options struct {
 	RejectDisposable   bool          // Whether to invalidate disposable domains
 	RejectFreeProvider bool          // Whether to invalidate free email providers
 	RejectIPDomains    bool          // Whether to reject IP address domains
+	RejectNamedEmails  bool          // Whether to reject named email addresses (e.g. "First Last <first.last@example.com>")
 	RejectReserved     bool          // Whether to invalidate reserved example domains
 }
 
@@ -42,6 +43,7 @@ func DefaultOptions() Options {
 		RejectDisposable:   false,
 		RejectFreeProvider: false,
 		RejectIPDomains:    false,
+		RejectNamedEmails:  false,
 		RejectReserved:     false,
 	}
 }
@@ -161,6 +163,14 @@ func (v *Validator) Validate(email string) ValidationResult {
 	// Store both name and address components
 	result.Name = addr.Name
 	result.Address = addr.Address
+
+	if v.options.RejectNamedEmails {
+		if result.Address != email {
+			result.Error = fmt.Errorf("named email addresses are not allowed")
+			result.ValidationTime = time.Since(start)
+			return result
+		}
+	}
 
 	parts := strings.Split(addr.Address, "@")
 	domain := parts[1]

@@ -399,6 +399,190 @@ func TestReservedDomains(t *testing.T) {
 	}
 }
 
+func TestNamedEmails(t *testing.T) {
+	opts := mailcop.DefaultOptions()
+	opts.CheckDNS = false
+	opts.MaxEmailLength = 254
+	opts.MinDomainLength = 3
+
+	tests := []struct {
+		name        string
+		email       string
+		rejectNamed bool
+		expected    mailcop.ValidationResult
+	}{
+		{
+			name:        "simple display name with quotes",
+			email:       `"John Doe" <john.doe@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "John Doe",
+				Address:  "john.doe@example.com",
+				Original: `"John Doe" <john.doe@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with special characters",
+			email:       `"Müller, Hans" <hans.mueller@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Müller, Hans",
+				Address:  "hans.mueller@example.com",
+				Original: `"Müller, Hans" <hans.mueller@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with escaped quotes",
+			email:       `"O\"Reilly, Bill" <bill@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     `O"Reilly, Bill`,
+				Address:  "bill@example.com",
+				Original: `"O\"Reilly, Bill" <bill@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with parentheses",
+			email:       `"Support (ACME)" <support@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Support (ACME)",
+				Address:  "support@example.com",
+				Original: `"Support (ACME)" <support@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with emojis",
+			email:       `"👨‍💻 Tech Support" <help@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "👨‍💻 Tech Support",
+				Address:  "help@example.com",
+				Original: `"👨‍💻 Tech Support" <help@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with multiple spaces",
+			email:       `"Sales   Department" <sales@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Sales   Department",
+				Address:  "sales@example.com",
+				Original: `"Sales   Department" <sales@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with period",
+			email:       `Mr. Smith <smith@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Mr. Smith",
+				Address:  "smith@example.com",
+				Original: `Mr. Smith <smith@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with numbers",
+			email:       `"Room 101" <room101@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Room 101",
+				Address:  "room101@example.com",
+				Original: `"Room 101" <room101@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "display name with symbols",
+			email:       `"Support & Sales" <support-sales@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "Support & Sales",
+				Address:  "support-sales@example.com",
+				Original: `"Support & Sales" <support-sales@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "reject complex display name",
+			email:       `"O'Reilly, Bill Jr." <bill@example.com>`,
+			rejectNamed: true,
+			expected: mailcop.ValidationResult{
+				Name:     "O'Reilly, Bill Jr.",
+				Address:  "bill@example.com",
+				Original: `"O'Reilly, Bill Jr." <bill@example.com>`,
+				IsValid:  false,
+			},
+		},
+		{
+			name:        "allow simple display name",
+			email:       `"John Doe" <john.doe@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "John Doe",
+				Address:  "john.doe@example.com",
+				Original: `"John Doe" <john.doe@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "reject display name",
+			email:       `"John Doe" <john.doe@example.com>`,
+			rejectNamed: true,
+			expected: mailcop.ValidationResult{
+				Name:     "John Doe",
+				Address:  "john.doe@example.com",
+				Original: `"John Doe" <john.doe@example.com>`,
+				IsValid:  false,
+			},
+		},
+		{
+			name:        "display name with missing quote",
+			email:       `John Doe <john.doe@example.com>`,
+			rejectNamed: false,
+			expected: mailcop.ValidationResult{
+				Name:     "John Doe",
+				Address:  "john.doe@example.com",
+				Original: `John Doe <john.doe@example.com>`,
+				IsValid:  true,
+			},
+		},
+		{
+			name:        "reject display name with missing quote",
+			email:       `John Doe <john.doe@example.com>`,
+			rejectNamed: true,
+			expected: mailcop.ValidationResult{
+				Name:     "John Doe",
+				Address:  "john.doe@example.com",
+				Original: `John Doe <john.doe@example.com>`,
+				IsValid:  false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts.RejectNamedEmails = tt.rejectNamed
+			v, err := mailcop.New(opts)
+			require.NoError(t, err)
+			require.NotNil(t, v)
+
+			result := v.Validate(tt.email)
+			assert.Equal(t, tt.expected.Name, result.Name)
+			assert.Equal(t, tt.expected.Address, result.Address)
+			assert.Equal(t, tt.expected.Original, result.Original)
+			assert.Equal(t, tt.expected.IsValid, result.IsValid)
+		})
+	}
+}
+
 func TestIPDomains(t *testing.T) {
 	tests := []struct {
 		name    string

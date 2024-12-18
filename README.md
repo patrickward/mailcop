@@ -50,9 +50,10 @@ opts := mailcop.Options{
     FreeProvidersURL:   "",
     MaxEmailLength:     254,
     MinDomainLength:    1,
-    RejectDisposable:   true,
-    RejectFreeProvider: true,
+    RejectDisposable:   false,
+    RejectFreeProvider: false,
     RejectIPDomains:    true,
+	RejectNamedEmails:  true,
     RejectReserved:     true,
 }
 
