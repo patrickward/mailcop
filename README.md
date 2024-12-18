@@ -55,6 +55,9 @@ validator, err := mailcop.New(opts)
 if err != nil {
     log.Fatal(err)
 }
+
+result := validator.Validate("user@example.com")
+fmt.Printf("Name: %s, Address: %s, Valid: %v\n", result.Name, result.Address, result.IsValid)
 ```
 
 Validate multiple addresses concurrently:
@@ -67,7 +70,7 @@ emails := []string{
 
 results := validator.ValidateMany(emails)
 for _, result := range results {
-    fmt.Printf("Email: %s, Valid: %v\n", result.Original, result.IsValid)
+    fmt.Printf("Name: %s, Address: %s, Valid: %v\n", result.Name, result.Address, result.IsValid)
 }
 ```
 
