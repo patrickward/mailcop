@@ -5,6 +5,7 @@ It uses the Go standard library for syntax validation and provides options for c
 disposable email domains, free email providers, and reserved domains.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/patrickward/mailcop.svg)](https://pkg.go.dev/github.com/patrickward/mailcop)
+[![Go Report Card](https://goreportcard.com/badge/github.com/patrickward/mailcop)](https://goreportcard.com/report/github.com/patrickward/mailcop)
 
 ## Features
 
