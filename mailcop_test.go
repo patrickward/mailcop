@@ -78,38 +78,38 @@ func TestValidate(t *testing.T) {
 			name:  "invalid email - no @",
 			email: "invalid.email",
 			expected: mailcop.ValidationResult{
-				Original: "invalid.email",
-				IsValid:  false,
-				Error:    assert.AnError,
+				Original:  "invalid.email",
+				IsValid:   false,
+				LastError: assert.AnError,
 			},
 		},
 		{
 			name:  "invalid email - multiple @",
 			email: "user@host@domain.com",
 			expected: mailcop.ValidationResult{
-				Original: "user@host@domain.com",
-				IsValid:  false,
-				Error:    assert.AnError,
+				Original:  "user@host@domain.com",
+				IsValid:   false,
+				LastError: assert.AnError,
 			},
 		},
 		{
 			name:  "invalid email - domain too short",
 			email: "user@ex",
 			expected: mailcop.ValidationResult{
-				Name:     "",
-				Address:  "user@ex",
-				Original: "user@ex",
-				IsValid:  false,
-				Error:    assert.AnError,
+				Name:      "",
+				Address:   "user@ex",
+				Original:  "user@ex",
+				IsValid:   false,
+				LastError: assert.AnError,
 			},
 		},
 		{
 			name:  "email exceeding max length",
 			email: createLongEmail(300),
 			expected: mailcop.ValidationResult{
-				Original: createLongEmail(300),
-				IsValid:  false,
-				Error:    assert.AnError,
+				Original:  createLongEmail(300),
+				IsValid:   false,
+				LastError: assert.AnError,
 			},
 		},
 	}
@@ -119,10 +119,10 @@ func TestValidate(t *testing.T) {
 			result := v.Validate(tt.email)
 
 			// Check if error expectation matches
-			if tt.expected.Error != nil {
-				assert.Error(t, result.Error)
+			if tt.expected.LastError != nil {
+				assert.Error(t, result.LastError)
 			} else {
-				assert.NoError(t, result.Error)
+				assert.NoError(t, result.LastError)
 			}
 
 			// Check other fields
@@ -207,9 +207,9 @@ func TestValidatorOptions(t *testing.T) {
 			result := v.Validate(tt.email)
 
 			if tt.expectError {
-				assert.Error(t, result.Error)
+				assert.Error(t, result.LastError)
 			} else {
-				assert.NoError(t, result.Error)
+				assert.NoError(t, result.LastError)
 			}
 
 			assert.Equal(t, tt.expectValid, result.IsValid)
@@ -253,7 +253,7 @@ func TestValidateMany(t *testing.T) {
 			validCount++
 		case "invalid@":
 			assert.False(t, result.IsValid)
-			assert.Error(t, result.Error)
+			assert.Error(t, result.LastError)
 		case `"John Doe" <john@example.com>`:
 			assert.True(t, result.IsValid)
 			assert.Equal(t, "John Doe", result.Name)
@@ -701,10 +701,10 @@ func TestIPDomains(t *testing.T) {
 			assert.Equal(t, tt.wantIP, result.IsIPDomain)
 			if tt.wantErr {
 				assert.False(t, result.IsValid)
-				assert.Error(t, result.Error)
+				assert.Error(t, result.LastError)
 			} else {
 				assert.True(t, result.IsValid)
-				assert.NoError(t, result.Error)
+				assert.NoError(t, result.LastError)
 			}
 		})
 	}

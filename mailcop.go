@@ -61,15 +61,23 @@ func DefaultFreeProviders() map[string]struct{} {
 
 type ValidationResult struct {
 	Address        string        // Normalized email address
-	Error          error         // Validation error
 	IsDisposable   bool          // Whether the domain is disposable
 	IsFreeProvider bool          // Whether the domain is a free provider
 	IsIPDomain     bool          // Whether the domain is an IP address
 	IsReserved     bool          // Whether the domain is reserved
 	IsValid        bool          // Whether the email is valid
+	LastError      error         // Validation error
 	Name           string        // Parsed name from email
 	Original       string        // Original email address input
 	ValidationTime time.Duration // Time taken to validate
+}
+
+// ErrorMessage returns the last validation error as a string if present, otherwise an empty string
+func (vr ValidationResult) ErrorMessage() string {
+	if vr.LastError != nil {
+		return vr.LastError.Error()
+	}
+	return ""
 }
 
 type Validator struct {
@@ -147,7 +155,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 
 	// Quick length check before more expensive operations
 	if len(email) > v.options.MaxEmailLength {
-		result.Error = fmt.Errorf("email exceeds maximum length of %d characters", v.options.MaxEmailLength)
+		result.LastError = fmt.Errorf("email exceeds maximum length of %d characters", v.options.MaxEmailLength)
 		result.ValidationTime = time.Since(start)
 		return result
 	}
@@ -155,7 +163,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 	// Parse email address including name component
 	addr, err := mail.ParseAddress(email)
 	if err != nil {
-		result.Error = fmt.Errorf("invalid email format: %v", err)
+		result.LastError = fmt.Errorf("invalid email format: %v", err)
 		result.ValidationTime = time.Since(start)
 		return result
 	}
@@ -166,7 +174,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 
 	if v.options.RejectNamedEmails {
 		if result.Address != email {
-			result.Error = fmt.Errorf("named email addresses are not allowed")
+			result.LastError = fmt.Errorf("named email addresses are not allowed")
 			result.ValidationTime = time.Since(start)
 			return result
 		}
@@ -177,7 +185,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 
 	// Check for minimum domain length
 	if len(domain) < v.options.MinDomainLength {
-		result.Error = fmt.Errorf("domain must be at least %d characters", v.options.MinDomainLength)
+		result.LastError = fmt.Errorf("domain must be at least %d characters", v.options.MinDomainLength)
 		result.ValidationTime = time.Since(start)
 		return result
 	}
@@ -186,7 +194,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 	if v.isIPDomain(domain) {
 		result.IsIPDomain = true
 		if v.options.RejectIPDomains {
-			result.Error = fmt.Errorf("IP address domains are not allowed")
+			result.LastError = fmt.Errorf("IP address domains are not allowed")
 			result.ValidationTime = time.Since(start)
 			return result
 		}
@@ -196,7 +204,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 	if v.isReserved(domain) {
 		result.IsReserved = true
 		if v.options.RejectReserved {
-			result.Error = fmt.Errorf("reserved domain: %s", domain)
+			result.LastError = fmt.Errorf("reserved domain: %s", domain)
 			result.ValidationTime = time.Since(start)
 			return result
 		}
@@ -206,7 +214,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 	if v.isDisposable(domain) {
 		result.IsDisposable = true
 		if v.options.RejectDisposable {
-			result.Error = fmt.Errorf("disposable domain: %s", domain)
+			result.LastError = fmt.Errorf("disposable domain: %s", domain)
 			result.ValidationTime = time.Since(start)
 			return result
 		}
@@ -215,14 +223,14 @@ func (v *Validator) Validate(email string) ValidationResult {
 	if v.isFreeProvider(domain) {
 		result.IsFreeProvider = true
 		if v.options.RejectFreeProvider {
-			result.Error = fmt.Errorf("free email provider: %s", domain)
+			result.LastError = fmt.Errorf("free email provider: %s", domain)
 			result.ValidationTime = time.Since(start)
 			return result
 		}
 	}
 
 	if err := v.validateMX(domain); err != nil {
-		result.Error = fmt.Errorf("invalid domain: %v", err)
+		result.LastError = fmt.Errorf("invalid domain: %v", err)
 		result.ValidationTime = time.Since(start)
 		return result
 	}
