@@ -20,6 +20,16 @@ func (v *Validator) RegisterFreeProviders(providers []string) {
 	}
 }
 
+// RegisterDisposableDomains manually adds domains to the disposable domains list
+func (v *Validator) RegisterDisposableDomains(domains []string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	for _, domain := range domains {
+		v.disposableDomains[domain] = struct{}{}
+	}
+}
+
 // LoadDisposableDomains loads a list of disposable domains from a JSON file or URL
 func (v *Validator) LoadDisposableDomains(urlStr string) error {
 	if !v.options.CheckDisposable || urlStr == "" {

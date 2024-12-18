@@ -47,7 +47,7 @@ opts := mailcop.Options{
     MinDomainLength:    1,
     RejectDisposable:   true,
     RejectFreeProvider: true,
-	RejectIPDomains:    true,
+    RejectIPDomains:    true,
     RejectReserved:     true,
 }
 
@@ -86,4 +86,40 @@ type ValidationResult struct {
     ValidationTime time.Duration // Time taken to validate
     Error          error         // Validation error
 }
+```
+
+## Free Email Providers
+
+The `CheckFreeProvider` option can be used to detect free email providers. Disabled by default.
+
+You can provide a list of free email domains by setting the `FreeProvidersURL` option to a URL that returns a JSON array of strings:
+```json
+[
+    "gmail.com",
+    "yahoo.com",
+    "hotmail.com"
+]
+```
+
+You can add providers via the `RegisterFreeProviders` method:
+```go
+    validator.RegisterFreeProviders([]string{"gmail.com", "yahoo.com"})
+``` 
+
+## Disposable Email Domains
+
+The `CheckDisposable` option can be used to detect disposable email domains. Disabled by default. 
+
+You can provide a list of disposable domains by setting the `DisposableListURL` option to a URL that returns a JSON array of strings:
+```json
+[
+    "mailinator.com",
+    "guerrillamail.com",
+    "10minutemail.com"
+]
+```
+
+You can add domains via the `RegisterDisposableDomains` method:
+```go
+    validator.RegisterDisposableDomains([]string{"mailinator.com", "guerrillamail.com"})
 ```
