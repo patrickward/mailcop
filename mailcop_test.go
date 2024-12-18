@@ -413,9 +413,9 @@ func TestIPDomains(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "IPv4 without brackets (ParseAddress fails on IPv4 without brackets)",
+			name:    "IPv4 without brackets",
 			email:   "user@192.168.1.1",
-			wantIP:  false,
+			wantIP:  true,
 			wantErr: true,
 		},
 		{

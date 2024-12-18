@@ -2,7 +2,6 @@ package mailcop
 
 import (
 	"fmt"
-	"net"
 	"net/mail"
 	"strings"
 	"sync"
@@ -14,6 +13,8 @@ type Options struct {
 	CheckDNS           bool          // Whether to perform DNS MX lookup
 	CheckDisposable    bool          // Whether to check for disposable domains
 	CheckFreeProvider  bool          // Whether to check for free email providers
+	DNSCacheTTL        time.Duration // TTL for DNS cache
+	DNSCacheSize       int           // Maximum number of DNS cache entries
 	DNSTimeout         time.Duration // Timeout for DNS lookups
 	DisposableListURL  string        // URL for disposable domains list
 	FreeProvidersURL   string        // URL for free email providers list
@@ -28,9 +29,11 @@ type Options struct {
 // DefaultOptions returns the default validator options
 func DefaultOptions() Options {
 	return Options{
-		CheckDNS:           true,
+		CheckDNS:           false,
 		CheckDisposable:    false,
 		CheckFreeProvider:  false,
+		DNSCacheTTL:        1 * time.Hour,
+		DNSCacheSize:       1000,
 		DNSTimeout:         3 * time.Second,
 		DisposableListURL:  "https://disposable.github.io/disposable-email-domains/domains.json",
 		FreeProvidersURL:   "",
@@ -38,7 +41,7 @@ func DefaultOptions() Options {
 		MinDomainLength:    1,
 		RejectDisposable:   false,
 		RejectFreeProvider: false,
-		RejectIPDomains:    true,
+		RejectIPDomains:    false,
 		RejectReserved:     false,
 	}
 }
@@ -68,17 +71,21 @@ type ValidationResult struct {
 }
 
 type Validator struct {
-	options           Options
-	disposableDomains map[string]struct{}
-	freeProviders     map[string]struct{}
+	options           Options              // Validator options
+	disposableDomains map[string]struct{}  // Disposable domains
+	freeProviders     map[string]struct{}  // Free email providers
+	dnsCache          map[string]dnsResult // LRUCache for DNS lookups
 	mu                sync.RWMutex
 }
 
 func New(options Options) (*Validator, error) {
+	options = mergeWithDefaults(options)
+
 	v := &Validator{
 		options:           options,
 		disposableDomains: make(map[string]struct{}),
 		freeProviders:     DefaultFreeProviders(),
+		dnsCache:          make(map[string]dnsResult),
 	}
 
 	// Load disposable domains if enabled
@@ -98,24 +105,37 @@ func New(options Options) (*Validator, error) {
 	return v, nil
 }
 
-// validateDomain validates the given domain by performing a DNS MX lookup
-func (v *Validator) validateDomain(domain string) error {
-	if !v.options.CheckDNS {
-		return nil
+// mergeWithDefaults takes user options and fills in any zero values with defaults
+func mergeWithDefaults(opts Options) Options {
+	defaults := DefaultOptions()
+
+	// Only override non-zero/non-default values
+	if opts.DNSCacheTTL == 0 {
+		opts.DNSCacheTTL = defaults.DNSCacheTTL
+	}
+	if opts.DNSCacheSize == 0 {
+		opts.DNSCacheSize = defaults.DNSCacheSize
+	}
+	if opts.DNSTimeout == 0 {
+		opts.DNSTimeout = defaults.DNSTimeout
+	}
+	if opts.MaxEmailLength == 0 {
+		opts.MaxEmailLength = defaults.MaxEmailLength
+	}
+	if opts.MinDomainLength == 0 {
+		opts.MinDomainLength = defaults.MinDomainLength
+	}
+	if opts.DisposableListURL == "" {
+		opts.DisposableListURL = defaults.DisposableListURL
+	}
+	if opts.FreeProvidersURL == "" {
+		opts.FreeProvidersURL = defaults.FreeProvidersURL
 	}
 
-	done := make(chan error, 1)
-	go func() {
-		_, err := net.LookupMX(domain)
-		done <- err
-	}()
+	// Boolean flags don't need special handling as they'll have their zero value (false)
+	// unless explicitly set
 
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(v.options.DNSTimeout):
-		return fmt.Errorf("DNS lookup timeout after %v", v.options.DNSTimeout)
-	}
+	return opts
 }
 
 // Validate checks a single email address
@@ -191,7 +211,7 @@ func (v *Validator) Validate(email string) ValidationResult {
 		}
 	}
 
-	if err := v.validateDomain(domain); err != nil {
+	if err := v.validateMX(domain); err != nil {
 		result.Error = fmt.Errorf("invalid domain: %v", err)
 		result.ValidationTime = time.Since(start)
 		return result

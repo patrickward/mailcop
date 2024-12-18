@@ -43,6 +43,8 @@ opts := mailcop.Options{
     CheckDNS:           true,
     CheckDisposable:    false,
     CheckFreeProvider:  false,
+    DNSCacheTTL:        1 * time.Hour,
+    DNSCacheSize:       1000,
     DNSTimeout:         3 * time.Second,
     DisposableListURL:  "https://disposable.github.io/disposable-email-domains/domains.json",
     FreeProvidersURL:   "",

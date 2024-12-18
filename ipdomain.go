@@ -17,6 +17,8 @@ func (v *Validator) isIPDomain(domain string) bool {
 		if ip := net.ParseIP(ipStr); ip != nil {
 			return true // Valid IPv4 or IPv6
 		}
+	} else if ip := net.ParseIP(domain); ip != nil {
+		return true // Valid IPv4 or IPv6
 	}
 	return false
 }
