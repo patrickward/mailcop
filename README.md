@@ -61,6 +61,48 @@ emails := []string{
 results := validator.ValidateMany(emails)
 ```
 
+[Previous content up to Basic Usage section remains the same...]
+
+## Thread Safety
+
+The validator is designed to be thread-safe and can be safely shared across multiple goroutines. This means you can:
+- Initialize a single validator instance at application startup
+- Share it across your entire application
+- Use it concurrently in web server handlers
+- Perform parallel validations
+
+```go
+// Initialize once at startup
+emailValidator, err := mailcop.New(mailcop.DefaultOptions())
+if err != nil {
+    log.Fatal(err)
+}
+
+// Use safely across multiple goroutines in your web server
+http.HandleFunc("/validate", func(w http.ResponseWriter, r *http.Request) {
+    email := r.FormValue("email")
+    result := emailValidator.Validate(email)
+    // Handle result...
+})
+
+// Or use ValidateMany for concurrent validation of multiple emails
+emails := []string{
+    "user1@example.com",
+    "user2@gmail.com",
+    "invalid@",
+}
+results := emailValidator.ValidateMany(emails) // Internally uses goroutines
+```
+
+Thread safety is ensured through:
+- Proper mutex usage for all shared state access
+- Read-write locks for optimized concurrent reads
+- Thread-safe Bloom filter implementation
+- Safe DNS cache management
+- Consistent lock ordering to prevent deadlocks
+
+This makes the validator suitable for high-concurrency environments like web servers, API services, and background processing systems.
+
 ## Configuration Options
 
 ```go
