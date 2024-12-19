@@ -13,16 +13,18 @@ type BloomOptions struct {
 	// Lower values use more memory but have fewer false positives
 	FalsePositiveRate float64
 
-	// TrustedDomains is an optional set of domains to whitelist
-	// These domains will never be considered disposable
-	TrustedDomains map[string]struct{}
-
-	// VerificationAttempts is the number of times to check the bloom filter
-	// Multiple checks reduce false positives exponentially:
-	// - 1 check: FalsePositiveRate chance
-	// - 2 checks: FalsePositiveRate^2 chance
-	// - 3 checks: FalsePositiveRate^3 chance
-	// Default is 1
+	// VerificationAttempts reduces false positives exponentially by checking
+	// the domain multiple times with different hash functions. Each check must
+	// return "probably in set" for the domain to be considered disposable.
+	// The actual false positive rate becomes FalsePositiveRate^VerificationAttempts.
+	//
+	// Examples with FalsePositiveRate = 0.01 (1%):
+	// - 1 attempt: 1% false positives (0.01^1)
+	// - 2 attempts: 0.01% false positives (0.01^2)
+	// - 3 attempts: 0.0001% false positives (0.01^3)
+	//
+	// Higher values provide better accuracy at the cost of more CPU time.
+	// Default is 1.
 	VerificationAttempts int
 }
 
@@ -30,7 +32,6 @@ type BloomOptions struct {
 func DefaultBloomOptions() BloomOptions {
 	return BloomOptions{
 		FalsePositiveRate:    0.001, // 0.1% false positive rate
-		TrustedDomains:       make(map[string]struct{}),
 		VerificationAttempts: 1,
 	}
 }
@@ -64,11 +65,8 @@ func (v *Validator) UseBloomFilter(url string, opts BloomOptions) error {
 	// Switch to bloom filter implementation
 	v.bloomFilter = filter
 
-	// Clear the existing map and use it for trusted domains
-	v.disposableDomains = opts.TrustedDomains
-	if v.disposableDomains == nil {
-		v.disposableDomains = make(map[string]struct{})
-	}
+	// Clear the existing map
+	v.disposableDomains = make(map[string]struct{})
 
 	v.bloomOptions = opts
 	return nil

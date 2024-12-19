@@ -12,41 +12,42 @@ import (
 
 // Options contains configuration options for email validation
 type Options struct {
-	CheckDNS           bool          // Whether to perform DNS MX lookup
-	CheckDisposable    bool          // Whether to check for disposable domains
-	CheckFreeProvider  bool          // Whether to check for free email providers
-	DNSCacheTTL        time.Duration // TTL for DNS cache
-	DNSCacheSize       int           // Maximum number of DNS cache entries
-	DNSTimeout         time.Duration // Timeout for DNS lookups
-	DisposableListURL  string        // URL for disposable domains list
-	FreeProvidersURL   string        // URL for free email providers list
-	MaxEmailLength     int           // Maximum email length
-	MinDomainLength    int           // Minimum domain length
-	RejectDisposable   bool          // Whether to invalidate disposable domains
-	RejectFreeProvider bool          // Whether to invalidate free email providers
-	RejectIPDomains    bool          // Whether to reject IP address domains
-	RejectNamedEmails  bool          // Whether to reject named email addresses (e.g. "First Last <first.last@example.com>")
-	RejectReserved     bool          // Whether to invalidate reserved example domains
+	CheckDNS             bool          // Whether to perform DNS MX lookup
+	CheckDisposable      bool          // Whether to check for disposable domains
+	CheckFreeProvider    bool          // Whether to check for free email providers
+	DNSCacheTTL          time.Duration // TTL for DNS cache
+	DNSCacheSize         int           // Maximum number of DNS cache entries
+	DNSTimeout           time.Duration // Timeout for DNS lookups
+	DisposableDomainsURL string        // URL for disposable domains list
+	FreeProvidersURL     string        // URL for free email providers list
+	MaxEmailLength       int           // Maximum email length
+	MinDomainLength      int           // Minimum domain length
+	RejectDisposable     bool          // Whether to invalidate disposable domains
+	RejectFreeProvider   bool          // Whether to invalidate free email providers
+	RejectIPDomains      bool          // Whether to reject IP address domains
+	RejectNamedEmails    bool          // Whether to reject named email addresses (e.g. "First Last <first.last@example.com>")
+	RejectReserved       bool          // Whether to invalidate reserved example domains
+	TrustedDomainsURL    string        // URL for trusted domains list
 }
 
 // DefaultOptions returns the default validator options
 func DefaultOptions() Options {
 	return Options{
-		CheckDNS:           false,
-		CheckDisposable:    false,
-		CheckFreeProvider:  false,
-		DNSCacheTTL:        1 * time.Hour,
-		DNSCacheSize:       1000,
-		DNSTimeout:         3 * time.Second,
-		DisposableListURL:  "https://disposable.github.io/disposable-email-domains/domains.json",
-		FreeProvidersURL:   "",
-		MaxEmailLength:     254,
-		MinDomainLength:    1,
-		RejectDisposable:   false,
-		RejectFreeProvider: false,
-		RejectIPDomains:    false,
-		RejectNamedEmails:  false,
-		RejectReserved:     false,
+		CheckDNS:             false,
+		CheckDisposable:      false,
+		CheckFreeProvider:    false,
+		DNSCacheTTL:          1 * time.Hour,
+		DNSCacheSize:         1000,
+		DNSTimeout:           3 * time.Second,
+		DisposableDomainsURL: "https://disposable.github.io/disposable-email-domains/domains.json",
+		FreeProvidersURL:     "",
+		MaxEmailLength:       254,
+		MinDomainLength:      1,
+		RejectDisposable:     false,
+		RejectFreeProvider:   false,
+		RejectIPDomains:      false,
+		RejectNamedEmails:    false,
+		RejectReserved:       false,
 	}
 }
 
@@ -84,11 +85,12 @@ func (vr ValidationResult) ErrorMessage() string {
 
 type Validator struct {
 	options           Options              // Validator options
-	disposableDomains map[string]struct{}  // Disposable domains
 	bloomFilter       *bloom.BloomFilter   // Bloom filter for disposable domains (optional)
 	bloomOptions      BloomOptions         // Bloom filter options
-	freeProviders     map[string]struct{}  // Free email providers
+	disposableDomains map[string]struct{}  // Disposable domains (only used for map-based validation)
 	dnsCache          map[string]dnsResult // LRUCache for DNS lookups
+	freeProviders     map[string]struct{}  // Free email providers
+	trustedDomains    map[string]struct{}  // Trusted domains
 	mu                sync.RWMutex
 }
 
@@ -98,13 +100,14 @@ func New(options Options) (*Validator, error) {
 	v := &Validator{
 		options:           options,
 		disposableDomains: make(map[string]struct{}),
-		freeProviders:     DefaultFreeProviders(),
 		dnsCache:          make(map[string]dnsResult),
+		freeProviders:     DefaultFreeProviders(),
+		trustedDomains:    make(map[string]struct{}),
 	}
 
 	// Load disposable domains if enabled
 	if options.CheckDisposable {
-		if err := v.LoadDisposableDomains(options.DisposableListURL); err != nil {
+		if err := v.LoadDisposableDomains(options.DisposableDomainsURL); err != nil {
 			return nil, fmt.Errorf("failed to load disposable domains: %v", err)
 		}
 	}
@@ -113,6 +116,13 @@ func New(options Options) (*Validator, error) {
 	if options.CheckFreeProvider {
 		if err := v.LoadFreeProviders(options.FreeProvidersURL); err != nil {
 			return nil, fmt.Errorf("failed to load free email providers: %v", err)
+		}
+	}
+
+	// Load trusted domains if a URL is provided
+	if options.TrustedDomainsURL != "" {
+		if err := v.LoadTrustedDomains(options.TrustedDomainsURL); err != nil {
+			return nil, fmt.Errorf("failed to load trusted domains: %v", err)
 		}
 	}
 
@@ -139,8 +149,8 @@ func mergeWithDefaults(opts Options) Options {
 	if opts.MinDomainLength == 0 {
 		opts.MinDomainLength = defaults.MinDomainLength
 	}
-	if opts.DisposableListURL == "" {
-		opts.DisposableListURL = defaults.DisposableListURL
+	if opts.DisposableDomainsURL == "" {
+		opts.DisposableDomainsURL = defaults.DisposableDomainsURL
 	}
 	if opts.FreeProvidersURL == "" {
 		opts.FreeProvidersURL = defaults.FreeProvidersURL

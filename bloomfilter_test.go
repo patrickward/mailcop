@@ -56,9 +56,7 @@ func TestBloomFilter(t *testing.T) {
 			name: "bloom filter with trusted domains",
 			setup: func(t *testing.T, v *mailcop.Validator) {
 				bloomOpts := mailcop.DefaultBloomOptions()
-				bloomOpts.TrustedDomains = map[string]struct{}{
-					"gmail.com": {},
-				}
+				v.RegisterTrustedDomains([]string{"gmail.com"})
 				err := v.UseBloomFilter(testDataPath, bloomOpts)
 				require.NoError(t, err)
 			},
@@ -150,7 +148,7 @@ func BenchmarkDataStructureMemory(b *testing.B) {
 			setup: func() (*mailcop.Validator, error) {
 				opts := mailcop.DefaultOptions()
 				opts.CheckDisposable = true
-				opts.DisposableListURL = testDataPath
+				opts.DisposableDomainsURL = testDataPath
 				return mailcop.New(opts)
 			},
 		},

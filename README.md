@@ -152,6 +152,24 @@ v.RegisterDisposableDomains([]string{
 })
 ```
 
+### Trusted Domains
+
+You can register trusted domains that will never be considered disposable, regardless of whether you're using the map or Bloom filter implementation:
+
+```go
+// Load from JSON file/URL
+err := v.LoadTrustedDomains("file:///path/to/trusted.json")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Or register manually
+v.RegisterTrustedDomains([]string{
+    "gmail.com",
+    "outlook.com",
+})
+```
+
 ### Bloom Filter Support
 
 #### What is a Bloom Filter?
@@ -173,6 +191,9 @@ opts := mailcop.DefaultOptions()
 opts.CheckDisposable = true
 v, err := mailcop.New(opts)
 
+// Register any trusted domains (optional)
+v.RegisterTrustedDomains([]string{"gmail.com"})
+
 // Configure and enable Bloom filter
 bloomOpts := mailcop.DefaultBloomOptions()
 err = v.UseBloomFilter("file:///path/to/domains.json", bloomOpts)
@@ -183,7 +204,7 @@ if err != nil {
 // Optional: Save filter to file for later use
 f, err := os.Create("filter.bloom")
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 defer f.Close()
 err = v.SaveBloomFilter(f)
@@ -191,7 +212,7 @@ err = v.SaveBloomFilter(f)
 // Optional: Load existing filter
 f, err := os.Open("filter.bloom")
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 defer f.Close()
 err = v.LoadBloomFilter(f)
@@ -201,41 +222,45 @@ err = v.LoadBloomFilter(f)
 
 ```go
 type BloomOptions struct {
-    // FalsePositiveRate sets the desired false positive rate (0.0 to 1.0)
-    // Lower values use more memory but have fewer false positives
-    FalsePositiveRate float64
+// FalsePositiveRate sets the desired false positive rate (0.0 to 1.0)
+// Lower values use more memory but have fewer false positives
+FalsePositiveRate float64
 
-    // TrustedDomains are never marked as disposable
-    TrustedDomains map[string]struct{}
-
-    // VerificationAttempts reduces false positives exponentially
-    // - 1 check: FalsePositiveRate
-    // - 2 checks: FalsePositiveRate^2
-    // - 3 checks: FalsePositiveRate^3
-    VerificationAttempts int
+// VerificationAttempts reduces false positives exponentially by checking
+// the domain multiple times with different hash functions. Each check must
+// return "probably in set" for the domain to be considered disposable.
+// The actual false positive rate becomes FalsePositiveRate^VerificationAttempts.
+//
+// Examples with FalsePositiveRate = 0.01 (1%):
+// - 1 attempt: 1% false positives (0.01^1)
+// - 2 attempts: 0.01% false positives (0.01^2)
+// - 3 attempts: 0.0001% false positives (0.01^3)
+//
+// Higher values provide better accuracy at the cost of more CPU time.
+// Default is 1.
+VerificationAttempts int
 }
 ```
 
-#### Configuring False Positives
-
-Balance memory usage and accuracy:
+This allows you to balance memory usage and accuracy:
 
 ```go
-// High accuracy, more memory
+// High memory efficiency, using multiple checks for accuracy
 bloomOpts := mailcop.DefaultBloomOptions()
-bloomOpts.FalsePositiveRate = 0.001     // 0.1%
-bloomOpts.VerificationAttempts = 1
+bloomOpts.FalsePositiveRate = 0.01 // Use less memory (1% base rate)
+bloomOpts.VerificationAttempts = 2 // Reduces to 0.01% actual false positives
 
-// Less memory, multiple verifications
+// High memory usage, single check
 bloomOpts := mailcop.DefaultBloomOptions()
-bloomOpts.FalsePositiveRate = 0.01      // 1%
-bloomOpts.VerificationAttempts = 2       // Reduces to 0.01%
+bloomOpts.FalsePositiveRate = 0.001 // Use more memory (0.1% false positives)
+bloomOpts.VerificationAttempts = 1  // Single check
 
 // With trusted domains
 bloomOpts.TrustedDomains = map[string]struct{}{
-    "gmail.com": {},
-    "outlook.com": {},
+"gmail.com": {},
+"outlook.com": {},
 }
+
 ```
 
 ## Domain Lists
@@ -266,8 +291,10 @@ ValidateMany(emails []string) []ValidationResult
 // Domain Management
 LoadDisposableDomains(url string) error
 LoadFreeProviders(url string) error
+LoadTrustedDomains(url string) error
 RegisterDisposableDomains(domains []string)
 RegisterFreeProviders(providers []string)
+RegisterTrustedDomains(domains []string)
 
 // Bloom Filter
 UseBloomFilter(url string, opts BloomOptions) error

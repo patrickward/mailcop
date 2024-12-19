@@ -36,6 +36,20 @@ func (v *Validator) RegisterDisposableDomains(domains []string) {
 	}
 }
 
+// RegisterTrustedDomains adds trusted domains that are never considered disposable
+func (v *Validator) RegisterTrustedDomains(domains []string) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if v.trustedDomains == nil {
+		v.trustedDomains = make(map[string]struct{})
+	}
+
+	for _, domain := range domains {
+		v.trustedDomains[domain] = struct{}{}
+	}
+}
+
 // LoadDisposableDomains loads domains from a JSON array into either the map
 // or bloom filter, depending on which implementation is being used
 func (v *Validator) LoadDisposableDomains(urlStr string) error {
@@ -81,6 +95,27 @@ func (v *Validator) LoadFreeProviders(urlStr string) error {
 
 	for _, provider := range providers {
 		v.freeProviders[provider] = struct{}{}
+	}
+
+	return nil
+}
+
+// LoadTrustedDomains loads a list of trusted domains from a JSON file or URL
+func (v *Validator) LoadTrustedDomains(urlStr string) error {
+	if urlStr == "" {
+		return nil
+	}
+
+	providers, err := v.loadProviderList(urlStr)
+	if err != nil {
+		return fmt.Errorf("failed to load trusted domains: %v", err)
+	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	for _, provider := range providers {
+		v.trustedDomains[provider] = struct{}{}
 	}
 
 	return nil
@@ -134,6 +169,11 @@ func (v *Validator) isDisposable(domain string) bool {
 
 	v.mu.RLock()
 	defer v.mu.RUnlock()
+
+	// Check trusted domains first
+	if _, ok := v.trustedDomains[domain]; ok {
+		return false
+	}
 
 	// If using bloom filter
 	if v.bloomFilter != nil {

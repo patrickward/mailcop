@@ -290,7 +290,7 @@ func TestLoadProviderLists(t *testing.T) {
 	opts.CheckDNS = false
 	opts.CheckDisposable = true
 	opts.CheckFreeProvider = true
-	opts.DisposableListURL = "file://" + filepath.Join(tmpDir, "disposable.json")
+	opts.DisposableDomainsURL = "file://" + filepath.Join(tmpDir, "disposable.json")
 	opts.FreeProvidersURL = "file://" + filepath.Join(tmpDir, "free_providers.json")
 	opts.RejectDisposable = true
 	opts.RejectFreeProvider = true
