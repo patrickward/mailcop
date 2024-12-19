@@ -20,17 +20,24 @@ func (v *Validator) RegisterFreeProviders(providers []string) {
 	}
 }
 
-// RegisterDisposableDomains manually adds domains to the disposable domains list
+// RegisterDisposableDomains adds domains to either the map or bloom filter
 func (v *Validator) RegisterDisposableDomains(domains []string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	for _, domain := range domains {
-		v.disposableDomains[domain] = struct{}{}
+	if v.bloomFilter != nil {
+		for _, domain := range domains {
+			v.bloomFilter.Add([]byte(domain))
+		}
+	} else {
+		for _, domain := range domains {
+			v.disposableDomains[domain] = struct{}{}
+		}
 	}
 }
 
-// LoadDisposableDomains loads a list of disposable domains from a JSON file or URL
+// LoadDisposableDomains loads domains from a JSON array into either the map
+// or bloom filter, depending on which implementation is being used
 func (v *Validator) LoadDisposableDomains(urlStr string) error {
 	if !v.options.CheckDisposable || urlStr == "" {
 		return nil
@@ -44,8 +51,15 @@ func (v *Validator) LoadDisposableDomains(urlStr string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	for _, provider := range providers {
-		v.disposableDomains[provider] = struct{}{}
+	// Add domains to either bloom filter or map
+	if v.bloomFilter != nil {
+		for _, provider := range providers {
+			v.bloomFilter.Add([]byte(provider))
+		}
+	} else {
+		for _, provider := range providers {
+			v.disposableDomains[provider] = struct{}{}
+		}
 	}
 
 	return nil
@@ -112,7 +126,7 @@ func (v *Validator) loadProviderList(urlStr string) ([]string, error) {
 	return providers, nil
 }
 
-// isDisposable checks if the given domain is in the disposable domains list
+// isDisposable checks if a domain is disposable using either implementation
 func (v *Validator) isDisposable(domain string) bool {
 	if !v.options.CheckDisposable {
 		return false
@@ -121,6 +135,25 @@ func (v *Validator) isDisposable(domain string) bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 
+	// If using bloom filter
+	if v.bloomFilter != nil {
+		// First check trusted domains (whitelist)
+		if _, ok := v.disposableDomains[domain]; ok {
+			return false
+		}
+
+		// Do multiple checks to reduce false positives
+		attempts := v.bloomOptions.VerificationAttempts
+		for i := 0; i < attempts; i++ {
+			if !v.bloomFilter.Test([]byte(domain)) {
+				return false // Definitely not disposable
+			}
+		}
+
+		return true // Probably disposable
+	}
+
+	// Original map implementation
 	_, exists := v.disposableDomains[domain]
 	return exists
 }

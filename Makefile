@@ -55,3 +55,7 @@ test/cover:
 	go test -v -race -buildvcs -coverprofile=/tmp/coverage.out ./...
 	go tool cover -html=/tmp/coverage.out
 
+## test/bench pkg=$1: run all benchmarks for the given package
+.PHONY: test/bench
+test/bench:
+	go test -v ./... -bench=. -benchmem -run ^$ #gosetup

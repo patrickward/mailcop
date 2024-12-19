@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/bits-and-blooms/bloom/v3"
 )
 
 // Options contains configuration options for email validation
@@ -83,6 +85,8 @@ func (vr ValidationResult) ErrorMessage() string {
 type Validator struct {
 	options           Options              // Validator options
 	disposableDomains map[string]struct{}  // Disposable domains
+	bloomFilter       *bloom.BloomFilter   // Bloom filter for disposable domains (optional)
+	bloomOptions      BloomOptions         // Bloom filter options
 	freeProviders     map[string]struct{}  // Free email providers
 	dnsCache          map[string]dnsResult // LRUCache for DNS lookups
 	mu                sync.RWMutex
