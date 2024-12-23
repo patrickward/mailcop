@@ -162,6 +162,11 @@ func mergeWithDefaults(opts Options) Options {
 	return opts
 }
 
+// IsValid checks if an email address is valid and immediately returns a boolean
+func (v *Validator) IsValid(email string) bool {
+	return v.Validate(email).IsValid
+}
+
 // Validate checks a single email address
 func (v *Validator) Validate(email string) ValidationResult {
 	start := time.Now()
